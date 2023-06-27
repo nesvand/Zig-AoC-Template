@@ -10,9 +10,14 @@ const gpa = util.gpa;
 
 const data = @embedFile("data/day19.txt");
 
-pub fn main() !void {
-    
+pub fn main() anyerror!void {
+    try day1();
+    try day2();
 }
+
+pub fn day1() anyerror!void {}
+
+pub fn day2() anyerror!void {}
 
 // Useful stdlib functions
 const tokenize = std.mem.tokenize;
@@ -26,6 +31,7 @@ const lastIndexOfStr = std.mem.lastIndexOfLinear;
 const trim = std.mem.trim;
 const sliceMin = std.mem.min;
 const sliceMax = std.mem.max;
+const window = std.mem.window;
 
 const parseInt = std.fmt.parseInt;
 const parseFloat = std.fmt.parseFloat;

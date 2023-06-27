@@ -45,18 +45,22 @@ pub fn build(b: *Builder) void {
 
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
-    const mode = b.standardReleaseOptions();
+    // const mode = b.standardReleaseOptions();
+    const optimize = b.standardOptimizeOption(.{});
 
+    // Steps
     const install_all = b.step("install_all", "Install all days");
     const install_all_tests = b.step("install_tests_all", "Install tests for all days");
     const run_all = b.step("run_all", "Run all days");
-
     const generate = b.step("generate", "Generate stub files from template/template.zig");
-    const build_generate = b.addExecutable("generate", "template/generate.zig");
-    build_generate.setBuildMode(.ReleaseSafe);
-    const run_generate = build_generate.run();
-    run_generate.cwd = std.fs.path.dirname(@src().file).?;
-    generate.dependOn(&run_generate.step);
+
+    const build_generate = b.addExecutable(.{
+        .name = "generate",
+        .root_source_file = .{ .path = "template/generate.zig" },
+        .optimize = optimize,
+        .target = target,
+    });
+    generate.dependOn(&build_generate.step);
 
     // Set up an exe for each day
     var day: u32 = 1;
@@ -64,22 +68,31 @@ pub fn build(b: *Builder) void {
         const dayString = b.fmt("day{:0>2}", .{day});
         const zigFile = b.fmt("src/{s}.zig", .{dayString});
 
-        const exe = b.addExecutable(dayString, zigFile);
-        exe.setTarget(target);
-        exe.setBuildMode(mode);
+        const exe = b.addExecutable(.{
+            .name = dayString,
+            .root_source_file = .{ .path = zigFile },
+            .optimize = optimize,
+            .target = target,
+        });
         linkObject(b, exe);
-        exe.install();
+        b.installArtifact(exe);
 
         const install_cmd = b.addInstallArtifact(exe);
 
-        const run_test = b.addTest(zigFile);
-        run_test.setTarget(target);
-        run_test.setBuildMode(mode);
+        const run_test = b.addTest(.{
+            .name = b.fmt("test_{s}", .{dayString}),
+            .root_source_file = .{ .path = zigFile },
+            .optimize = optimize,
+            .target = target,
+        });
         linkObject(b, exe);
 
-        const build_test = b.addTestExe(b.fmt("test_{s}", .{dayString}), zigFile);
-        build_test.setTarget(target);
-        build_test.setBuildMode(mode);
+        const build_test = b.addExecutable(.{
+            .name = b.fmt("test_{s}", .{dayString}),
+            .root_source_file = .{ .path = zigFile },
+            .optimize = optimize,
+            .target = target,
+        });
         linkObject(b, exe);
         const install_test = b.addInstallArtifact(build_test);
 
@@ -106,7 +119,7 @@ pub fn build(b: *Builder) void {
             install_all_tests.dependOn(&install_test.step);
         }
 
-        const run_cmd = exe.run();
+        const run_cmd = b.addRunArtifact(exe);
         run_cmd.step.dependOn(&install_cmd.step);
         if (b.args) |args| {
             run_cmd.addArgs(args);
@@ -121,9 +134,12 @@ pub fn build(b: *Builder) void {
     // Set up tests for util.zig
     {
         const test_util = b.step("test_util", "Run tests in util.zig");
-        const test_cmd = b.addTest("src/util.zig");
-        test_cmd.setTarget(target);
-        test_cmd.setBuildMode(mode);
+        const test_cmd = b.addTest(.{
+            .name = "test_util",
+            .root_source_file = .{ .path = "src/util.zig" },
+            .optimize = optimize,
+            .target = target,
+        });
         linkObject(b, test_cmd);
         test_util.dependOn(&test_cmd.step);
     }
@@ -131,9 +147,12 @@ pub fn build(b: *Builder) void {
     // Set up test executable for util.zig
     {
         const test_util = b.step("install_tests_util", "Run tests in util.zig");
-        const test_exe = b.addTestExe("test_util", "src/util.zig");
-        test_exe.setTarget(target);
-        test_exe.setBuildMode(mode);
+        const test_exe = b.addExecutable(.{
+            .name = "test_util",
+            .root_source_file = .{ .path = "src/util.zig" },
+            .optimize = optimize,
+            .target = target,
+        });
         linkObject(b, test_exe);
         const install = b.addInstallArtifact(test_exe);
         test_util.dependOn(&install.step);
@@ -142,9 +161,12 @@ pub fn build(b: *Builder) void {
     // Set up a step to run all tests
     {
         const test_step = b.step("test", "Run all tests");
-        const test_cmd = b.addTest("src/test_all.zig");
-        test_cmd.setTarget(target);
-        test_cmd.setBuildMode(mode);
+        const test_cmd = b.addTest(.{
+            .name = "test_all",
+            .root_source_file = .{ .path = "src/test_all.zig" },
+            .optimize = optimize,
+            .target = target,
+        });
         linkObject(b, test_cmd);
         test_step.dependOn(&test_cmd.step);
     }
@@ -152,9 +174,12 @@ pub fn build(b: *Builder) void {
     // Set up a step to build tests (but not run them)
     {
         const test_build = b.step("install_tests", "Install test_all.exe");
-        const test_exe = b.addTestExe("test_all", "src/test_all.zig");
-        test_exe.setTarget(target);
-        test_exe.setBuildMode(mode);
+        const test_exe = b.addExecutable(.{
+            .name = "test_all",
+            .root_source_file = .{ .path = "src/test_all.zig" },
+            .optimize = optimize,
+            .target = target,
+        });
         linkObject(b, test_exe);
         const test_exe_install = b.addInstallArtifact(test_exe);
         test_build.dependOn(&test_exe_install.step);
