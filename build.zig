@@ -24,7 +24,7 @@ fn linkObject(b: *Builder, obj: *LibExeObjStep) void {
     // Add linking for packages or third party libraries here
 }
 
-pub fn build(b: *Builder) void {
+pub fn build(b: *Builder) anyerror!void {
     if (comptime @import("builtin").zig_version.order(required_zig_version) == .lt) {
         std.debug.print(
             \\Error: Your version of Zig is missing features that are needed for this template.
@@ -63,77 +63,89 @@ pub fn build(b: *Builder) void {
             .optimize = optimize_options,
             .target = target_options,
         });
-        generate_step.dependOn(&compile_generate.step);
+        const compile_run = b.addRunArtifact(compile_generate);
+        generate_step.dependOn(&compile_run.step);
     }
 
-    // Set up an exe for each day
-    var day: u32 = 1;
-    while (day <= 25) : (day += 1) {
-        const day_string = b.fmt("day{:0>2}", .{day});
-        const zig_file_path = b.pathJoin(&.{ "src", b.fmt("{s}.zig", .{day_string}) });
+    var srcDir = try std.fs.cwd().openIterableDir("src", .{});
+    defer srcDir.close();
+    var walker = try srcDir.walk(b.allocator);
+    defer walker.deinit();
 
-        const exe = b.addExecutable(.{
-            .name = day_string,
-            .root_source_file = .{ .path = zig_file_path },
-            .optimize = optimize_options,
-            .target = target_options,
-        });
+    while (try walker.next()) |entry| {
+        if (entry.kind == .file and std.mem.eql(u8, std.fs.path.extension(entry.path), ".zig") and std.mem.eql(u8, std.fs.path.basename(entry.path)[0..3], "day")) {
+            const name = try std.mem.replaceOwned(u8, b.allocator, entry.path[0 .. entry.path.len - 4], std.fs.path.sep_str, "-");
+            defer b.allocator.free(name);
 
-        linkObject(b, exe);
-        b.installArtifact(exe);
+            const program_path = b.pathJoin(&.{ "src", entry.path });
+            const exe = b.addExecutable(.{
+                .name = name,
+                .root_source_file = .{ .path = program_path },
+                .optimize = optimize_options,
+                .target = target_options,
+            });
+            linkObject(b, exe);
+            // b.installArtifact(exe); // Not needed because we include an install artifact
 
-        const exe_install_artifact = b.addInstallArtifact(exe);
+            const exe_install_artifact = b.addInstallArtifact(exe);
 
-        const run_test = b.addTest(.{
-            .name = b.fmt("test_{s}", .{day_string}),
-            .root_source_file = .{ .path = zig_file_path },
-            .optimize = optimize_options,
-            .target = target_options,
-        });
-        linkObject(b, exe);
+            // install_<dayxx> steps
+            {
+                const step_key = b.fmt("install_{s}", .{name});
+                const step_desc = b.fmt("Install {s}.exe", .{name});
+                const install_step = b.step(step_key, step_desc);
+                install_step.dependOn(&exe_install_artifact.step);
+                install_all.dependOn(&exe_install_artifact.step);
+            }
 
-        const build_test = b.addExecutable(.{
-            .name = b.fmt("test_{s}", .{day_string}),
-            .root_source_file = .{ .path = zig_file_path },
-            .optimize = optimize_options,
-            .target = target_options,
-        });
-        linkObject(b, exe);
-        const install_test = b.addInstallArtifact(build_test);
+            // <dayxx> steps - runs <dayxx>.exe after installing
+            {
+                const run_cmd = b.addRunArtifact(exe);
+                run_cmd.step.dependOn(&exe_install_artifact.step);
+                if (b.args) |args| {
+                    run_cmd.addArgs(args);
+                }
 
-        {
-            const step_key = b.fmt("install_{s}", .{day_string});
-            const step_desc = b.fmt("Install {s}.exe", .{day_string});
-            const install_step = b.step(step_key, step_desc);
-            install_step.dependOn(&exe_install_artifact.step);
-            install_all.dependOn(&exe_install_artifact.step);
+                const run_desc = b.fmt("Install and run {s}.exe", .{name});
+                const run_step = b.step(name, run_desc);
+                run_step.dependOn(&run_cmd.step);
+                run_all.dependOn(&run_cmd.step);
+            }
+
+            // test_<dayxx> - runs test(s) for <dayxx>
+            {
+                const run_test = b.addTest(.{
+                    .name = b.fmt("test_{s}", .{name}),
+                    .root_source_file = .{ .path = program_path },
+                    .optimize = optimize_options,
+                    .target = target_options,
+                });
+                linkObject(b, run_test);
+
+                const step_key = b.fmt("test_{s}", .{name});
+                const step_desc = b.fmt("Run tests in {s}", .{program_path});
+                const step = b.step(step_key, step_desc);
+                step.dependOn(&run_test.step);
+            }
+
+            // install_tests_<dayxx> - installs test(s) for <dayxx>
+            {
+                const build_test = b.addTest(.{
+                    .name = b.fmt("test_{s}", .{name}),
+                    .root_source_file = .{ .path = program_path },
+                    .optimize = optimize_options,
+                    .target = target_options,
+                });
+                linkObject(b, build_test);
+                const build_test_install_artifact = b.addInstallArtifact(build_test);
+
+                const step_key = b.fmt("install_tests_{s}", .{name});
+                const step_desc = b.fmt("Install test_{s}.exe", .{program_path});
+                const step = b.step(step_key, step_desc);
+                step.dependOn(&build_test_install_artifact.step);
+                install_all_tests.dependOn(&build_test_install_artifact.step);
+            }
         }
-
-        {
-            const step_key = b.fmt("test_{s}", .{day_string});
-            const step_desc = b.fmt("Run tests in {s}", .{zig_file_path});
-            const step = b.step(step_key, step_desc);
-            step.dependOn(&run_test.step);
-        }
-
-        {
-            const step_key = b.fmt("install_tests_{s}", .{day_string});
-            const step_desc = b.fmt("Install test_{s}.exe", .{day_string});
-            const step = b.step(step_key, step_desc);
-            step.dependOn(&install_test.step);
-            install_all_tests.dependOn(&install_test.step);
-        }
-
-        const run_cmd = b.addRunArtifact(exe);
-        run_cmd.step.dependOn(&exe_install_artifact.step);
-        if (b.args) |args| {
-            run_cmd.addArgs(args);
-        }
-
-        const run_desc = b.fmt("Run {s}", .{day_string});
-        const run_step = b.step(day_string, run_desc);
-        run_step.dependOn(&run_cmd.step);
-        run_all.dependOn(&run_cmd.step);
     }
 
     // Set up tests for util.zig
