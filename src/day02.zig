@@ -15,71 +15,73 @@ pub fn main() anyerror!void {
     try day2();
 }
 
-pub fn day1() anyerror!void {
-    var lines = split(u8, data, "\n");
-
+pub fn day1() !void {
+    var horizontal: u32 = 0;
     var depth: u32 = 0;
-    var horiz: u32 = 0;
-    while (lines.next()) |line| {
-        if (line.len == 0) {
-            continue;
-        }
-        var parts = split(u8, line, " ");
-        var directions = List([]const u8).init(gpa);
-        while (parts.next()) |part| {
-            if (part.len == 0) {
-                continue;
-            }
-            try directions.append(part);
-        }
-        const direction = directions.items[0];
-        var range = try parseInt(u32, directions.items[1], 10);
-        if (std.mem.eql(u8, direction, "up")) {
-            depth -= range;
-        } else if (std.mem.eql(u8, direction, "down")) {
-            depth += range;
-        } else if (std.mem.eql(u8, direction, "forward")) {
-            horiz += range;
-        } else {
-            unreachable;
+    var pos: usize = 0;
+
+    while (pos < data.len) {
+        switch (data[pos]) {
+            'u' => {
+                // `"up "` = 3 bytes
+                var distance = toUnsignedInt(u32, data[pos + 3 ..]);
+                depth -= distance.result;
+                pos += 3 + distance.size + 1;
+            },
+            'd' => {
+                // `"down "` = 5 bytes
+                var distance = toUnsignedInt(u32, data[pos + 5 ..]);
+                depth += distance.result;
+                pos += 5 + distance.size + 1;
+            },
+            'f' => {
+                // `"forward "` = 8 bytes
+                var distance = toUnsignedInt(u32, data[pos + 8 ..]);
+                horizontal += distance.result;
+                pos += 8 + distance.size + 1;
+            },
+            else => break,
         }
     }
-    print("{}\n", .{depth * horiz});
+
+    print("Part 1: {d}\n", .{depth * horizontal});
 }
 
 pub fn day2() anyerror!void {
-    var lines = split(u8, data, "\n");
-
-    var depth: u32 = 0;
-    var horiz: u32 = 0;
+    var horizontal: u32 = 0;
     var aim: u32 = 0;
-    while (lines.next()) |line| {
-        if (line.len == 0) {
-            continue;
-        }
-        var parts = split(u8, line, " ");
-        var directions = List([]const u8).init(gpa);
-        while (parts.next()) |part| {
-            if (part.len == 0) {
-                continue;
-            }
-            try directions.append(part);
-        }
-        const direction = directions.items[0];
-        var range = try parseInt(u32, directions.items[1], 10);
-        if (std.mem.eql(u8, direction, "up")) {
-            aim -= range;
-        } else if (std.mem.eql(u8, direction, "down")) {
-            aim += range;
-        } else if (std.mem.eql(u8, direction, "forward")) {
-            horiz += range;
-            depth += aim * range;
-        } else {
-            unreachable;
+    var depth: u32 = 0;
+    var pos: usize = 0;
+
+    while (pos < data.len) {
+        switch (data[pos]) {
+            'u' => {
+                var distance = toUnsignedInt(u32, data[pos + 3 ..]);
+                aim -= distance.result;
+
+                pos += 3 + distance.size + 1;
+            },
+            'd' => {
+                var distance = toUnsignedInt(u32, data[pos + 5 ..]);
+                aim += distance.result;
+
+                pos += 5 + distance.size + 1;
+            },
+            'f' => {
+                var distance = toUnsignedInt(u32, data[pos + 8 ..]);
+                horizontal += distance.result;
+                depth += aim * distance.result;
+
+                pos += 8 + distance.size + 1;
+            },
+            else => break,
         }
     }
-    print("{}\n", .{depth * horiz});
+
+    print("Part 2: {d}\n", .{depth * horizontal});
 }
+
+const toUnsignedInt = util.toUnsignedInt;
 
 // Useful stdlib functions
 const tokenize = std.mem.tokenize;
