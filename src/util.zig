@@ -61,6 +61,33 @@ pub fn window(comptime T: type, buffer: []const T, size: usize, advance: usize) 
     };
 }
 
+// from https://github.com/jchevertonwynne/advent-of-code-2021/blob/main/src/util.zig
+pub fn Result(comptime T: type) type {
+    return struct {
+        result: T,
+        size: usize,
+    };
+}
+
+// from https://github.com/jchevertonwynne/advent-of-code-2021/blob/main/src/util.zig
+pub fn toUnsignedInt(comptime T: type, contents: []const u8) Result(T) {
+    if (@typeInfo(T).Int.signedness == .signed)
+        @compileError("must supply a signed integer");
+
+    var result: T = 0;
+    var characters: usize = 0;
+
+    for (contents) |char, i| {
+        if ('0' <= char and char <= '9') {
+            result *= 10;
+            result += @as(T, char - '0');
+            characters = i;
+        } else break;
+    }
+
+    return .{ .result = result, .size = characters + 1 };
+}
+
 // Useful stdlib functions
 const tokenize = std.mem.tokenize;
 const split = std.mem.split;

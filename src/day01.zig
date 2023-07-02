@@ -15,50 +15,52 @@ pub fn main() anyerror!void {
     try part2();
 }
 
-pub fn part1() anyerror!void {
-    var lines = split(u8, data, "\n");
-    var prev: u32 = try parseInt(u32, lines.first(), 10);
-    var counter: u32 = 0;
-    while (lines.next()) |line| {
-        if (line.len == 0) {
-            continue;
-        }
-        var next: u32 = try parseInt(u32, line, 10);
-        if (prev < next) {
-            counter += 1;
-        }
-        prev = next;
+pub fn part1() !void {
+    var result: u32 = 0;
+    // 4 slot ringbuffer, initialized with max value - convenient to index through
+    // with a `u2` counter
+    //
+    // for `**` syntax - see: https://ziglearn.org/chapter-1/#comptime
+    var parsed: [4]u32 = [_]u32{std.math.maxInt(u32)} ** 4;
+    var n: u2 = 0;
+    var pos: usize = 0;
+
+    while (pos < data.len) : (n +%= 1) {
+        // `toUnsignedInt` returns a tuple of the parsed value and the number of bytes.
+        // This is non-destructive and parses up to the first non-digit character ie. `'\n'`.
+        var val = toUnsignedInt(u32, data[pos..]);
+        parsed[n] = val.result;
+        result += @boolToInt(parsed[n] > parsed[n -% 1]);
+        // We need to add 1 to the number of bytes to skip the newline.
+        pos += val.size + 1;
     }
-    print("{d}\n", .{counter});
+
+    print("part 1: {d}\n", .{result});
 }
 
 pub fn part2() anyerror!void {
-    var lines = split(u8, data, "\n");
-    var nums = List(u32).init(gpa);
-    defer nums.deinit();
-    while (lines.next()) |line| {
-        if (line.len == 0) {
-            continue;
-        }
-        var val: u32 = try parseInt(u32, line, 10);
-        try nums.append(val);
+    var result: u32 = 0;
+    var parsed: [4]u32 = [_]u32{std.math.maxInt(u32)} ** 4;
+    var n: u2 = 0;
+    var pos: usize = 0;
+
+    while (pos < data.len) : (n +%= 1) {
+        var val = toUnsignedInt(u32, data[pos..]);
+        parsed[n] = val.result;
+        // We're interested in the difference of two windows consisting of 3 numbers.
+        // The middle elements are shared, so they can be ignored, meaning the comparison
+        // is only between the first number of the first window and last number of the
+        // second window.
+        result += @boolToInt(parsed[n] > parsed[n -% 3]);
+        pos += val.size + 1;
     }
-    var windows = window(u32, nums.items, 3, 1);
-    const peek = windows.first();
-    var prev: u32 = peek[0] + peek[1] + peek[2];
-    var counter: u32 = 0;
-    while (windows.next()) |w| {
-        const curr = w[0] + w[1] + w[2];
-        if (curr > prev) {
-            counter += 1;
-        }
-        prev = curr;
-    }
-    print("{d}\n", .{counter});
+
+    print("part 2: {d}\n", .{result});
 }
 
 // Useful util functions
 const window = util.window;
+const toUnsignedInt = util.toUnsignedInt;
 
 // Useful stdlib functions
 const tokenize = std.mem.tokenize;

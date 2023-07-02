@@ -21,6 +21,8 @@ pub fn day2() anyerror!void {}
 
 // Useful util functions
 const window = util.window;
+const Result = util.Result;
+const toUnsignedInt = util.toUnsignedInt;
 
 // Useful stdlib functions
 const tokenize = std.mem.tokenize;
