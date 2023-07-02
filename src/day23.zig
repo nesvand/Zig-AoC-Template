@@ -19,6 +19,9 @@ pub fn day1() anyerror!void {}
 
 pub fn day2() anyerror!void {}
 
+// Useful util functions
+const window = util.window;
+
 // Useful stdlib functions
 const tokenize = std.mem.tokenize;
 const split = std.mem.split;
