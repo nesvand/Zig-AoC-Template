@@ -22,51 +22,36 @@ const Bits = struct {
 
 const bit_position_len = 12;
 
-pub fn day1() anyerror!void {
-    var bit_positions = List(Bits).init(gpa);
-    defer bit_positions.deinit();
-    var ii: u4 = 0;
-    while (ii < bit_position_len) : (ii += 1) {
-        try bit_positions.append(Bits{ .zero = 0, .one = 0 });
-    }
+fn day1() !void {
+    var line_length = indexOf(u8, data, '\n').?;
+    var reading_count = data.len / (line_length + 1);
+    var ones_count_table = try gpa.alloc(u32, @as(usize, line_length));
+    defer gpa.free(ones_count_table);
+    for (ones_count_table) |*t|
+        t.* = 0;
 
-    var lines = split(u8, data, "\n");
-    while (lines.next()) |line| {
-        if (line.len == 0) {
-            continue;
+    var pos: usize = 0;
+    while (pos < data.len) : (pos += line_length + 1) {
+        // exit on erroneous last line
+        if (pos + line_length + 1 > data.len) {
+            break;
         }
 
-        const val = try std.fmt.parseInt(u12, line, 2);
-
-        var i: u4 = 0;
-        while (i < bit_position_len) : (i += 1) {
-            var bit_position = bit_positions.items[i];
-
-            const bit = (val >> bit_position_len - i - 1) & 1;
-            if (bit == 0) {
-                bit_position.zero += 1;
-            } else {
-                bit_position.one += 1;
-            }
-            bit_positions.items[i] = bit_position;
+        for (data[pos .. pos + line_length]) |c, i| {
+            ones_count_table[i] += c - '0';
         }
     }
 
-    var gamma_rate: u12 = 0;
-    var epsilon_rate: u12 = 0;
-    var i: u4 = 0;
-    while (i < bit_position_len) : (i += 1) {
-        const bitPosition = bit_positions.items[i];
-        const zero = bitPosition.zero;
-        const one = bitPosition.one;
-        gamma_rate |= if (zero > one) 0 else @as(u12, 1) << bit_position_len - i - 1;
-        epsilon_rate |= if (one > zero) 0 else @as(u12, 1) << bit_position_len - i - 1;
+    var gamma: u12 = 0;
+    for (ones_count_table) |count| {
+        gamma <<= 1;
+        gamma += @boolToInt((count << 1) >= reading_count);
     }
 
-    print("power consumption: {d}\n", .{@as(u64, gamma_rate) * @as(u64, epsilon_rate)});
+    print("power consumption: {d}\n", .{@as(u32, gamma) * @as(u32, ~gamma)});
 }
 
-fn counts(readings: []u12) anyerror!List(Bits) {
+fn counts(readings: []u12) !List(Bits) {
     var bit_positions = List(Bits).init(gpa);
     var ii: u4 = 0;
     while (ii < bit_position_len) : (ii += 1) {
