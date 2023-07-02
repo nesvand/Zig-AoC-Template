@@ -57,6 +57,9 @@ pub fn part2() anyerror!void {
     print("{d}\n", .{counter});
 }
 
+// Useful util functions
+const window = util.window;
+
 // Useful stdlib functions
 const tokenize = std.mem.tokenize;
 const split = std.mem.split;
@@ -69,7 +72,6 @@ const lastIndexOfStr = std.mem.lastIndexOfLinear;
 const trim = std.mem.trim;
 const sliceMin = std.mem.min;
 const sliceMax = std.mem.max;
-const window = std.mem.window;
 
 const parseInt = std.fmt.parseInt;
 const parseFloat = std.fmt.parseFloat;

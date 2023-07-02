@@ -31,7 +31,6 @@ const lastIndexOfStr = std.mem.lastIndexOfLinear;
 const trim = std.mem.trim;
 const sliceMin = std.mem.min;
 const sliceMax = std.mem.max;
-const window = std.mem.window;
 
 const parseInt = std.fmt.parseInt;
 const parseFloat = std.fmt.parseFloat;

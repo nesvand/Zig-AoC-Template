@@ -31,7 +31,7 @@ fn readHashes() !*[25][Hash.digest_length]u8 {
     if (hash_bytes.len != 25 * Hash.digest_length)
         return error.InvalidFormat;
 
-    return @ptrCast(hash_bytes.ptr);
+    return @ptrCast(*[25][Hash.digest_length]u8, hash_bytes.ptr);
 }
 
 pub fn main() !void {
@@ -41,8 +41,7 @@ pub fn main() !void {
         error.FileNotFound => blk: {
             std.debug.print("{s} doesn't exist, will assume all files have been modified.\nDelete src/dayXX.zig and rerun `zig build generate` to regenerate it.\n", .{hashes_file});
             const mem = try gpa.allocator().create([25][Hash.digest_length]u8);
-            const fill: [16]u8 = .{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-            @memset(mem, fill);
+            @memset(@ptrCast([*]u8, mem), 0, @sizeOf(@TypeOf(mem.*)));
             break :blk mem;
         },
         error.InvalidFormat => {

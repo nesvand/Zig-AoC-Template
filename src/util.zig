@@ -11,6 +11,55 @@ pub const gpa = gpa_impl.allocator();
 
 // Add utility functions here
 
+pub fn WindowIterator(comptime T: type) type {
+    return struct {
+        buffer: []const T,
+        index: ?usize,
+        size: usize,
+        advance: usize,
+
+        const Self = @This();
+
+        /// Returns a slice of the first window. This never fails.
+        /// Call this only to get the first window and then use `next` to get
+        /// all subsequent windows.
+        pub fn first(self: *Self) []const T {
+            assert(self.index.? == 0);
+            return self.next().?;
+        }
+
+        /// Returns a slice of the next window, or null if window is at end.
+        pub fn next(self: *Self) ?[]const T {
+            const start = self.index orelse return null;
+            const next_index = start + self.advance;
+            const end = if (start + self.size < self.buffer.len and next_index < self.buffer.len) blk: {
+                self.index = next_index;
+                break :blk start + self.size;
+            } else blk: {
+                self.index = null;
+                break :blk self.buffer.len;
+            };
+
+            return self.buffer[start..end];
+        }
+
+        /// Resets the iterator to the initial window.
+        pub fn reset(self: *Self) void {
+            self.index = 0;
+        }
+    };
+}
+
+pub fn window(comptime T: type, buffer: []const T, size: usize, advance: usize) WindowIterator(T) {
+    assert(size != 0);
+    assert(advance != 0);
+    return .{
+        .index = 0,
+        .buffer = buffer,
+        .size = size,
+        .advance = advance,
+    };
+}
 
 // Useful stdlib functions
 const tokenize = std.mem.tokenize;
