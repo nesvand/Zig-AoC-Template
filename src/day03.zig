@@ -23,21 +23,21 @@ const Bits = struct {
 const bit_position_len = 12;
 
 fn day1() !void {
-    var line_length = indexOf(u8, data, '\n').?;
-    var reading_count = data.len / (line_length + 1);
-    var ones_count_table = try gpa.alloc(u32, @as(usize, line_length));
+    var reading_length = indexOf(u8, data, '\n').?;
+    var reading_count = data.len / (reading_length + 1);
+    var ones_count_table = try gpa.alloc(u32, @as(usize, reading_length));
     defer gpa.free(ones_count_table);
     for (ones_count_table) |*t|
         t.* = 0;
 
     var pos: usize = 0;
-    while (pos < data.len) : (pos += line_length + 1) {
+    while (pos < data.len) : (pos += reading_length + 1) {
         // exit on erroneous last line
-        if (pos + line_length + 1 > data.len) {
+        if (pos + reading_length + 1 > data.len) {
             break;
         }
 
-        for (data[pos .. pos + line_length]) |c, i| {
+        for (data[pos .. pos + reading_length]) |c, i| {
             ones_count_table[i] += c - '0';
         }
     }
@@ -51,112 +51,87 @@ fn day1() !void {
     print("power consumption: {d}\n", .{@as(u32, gamma) * @as(u32, ~gamma)});
 }
 
-fn counts(readings: []u12) !List(Bits) {
-    var bit_positions = List(Bits).init(gpa);
-    var ii: u4 = 0;
-    while (ii < bit_position_len) : (ii += 1) {
-        try bit_positions.append(Bits{ .zero = 0, .one = 0 });
-    }
+fn day2() !void {
+    var readings = data;
+    var reading_length = indexOf(u8, readings, '\n').?;
+    // explain
+    var bit_count_tree = try gpa.alloc(u32, std.math.pow(usize, 2, reading_length + 1));
+    defer gpa.free(bit_count_tree);
+    for (bit_count_tree) |*t|
+        t.* = 0;
 
-    for (readings) |val| {
-        var i: u4 = 0;
-        while (i < bit_position_len) : (i += 1) {
-            var bit_position = bit_positions.items[i];
+    var readings_pos: usize = 0;
+    while (readings_pos < readings.len) : (readings_pos += reading_length + 1) {
+        // exit on erroneous last line
+        if (readings_pos + reading_length + 1 > readings.len) {
+            break;
+        }
 
-            const bit = (val >> bit_position_len - i - 1) & 1;
-            if (bit == 0) {
-                bit_position.zero += 1;
-            } else {
-                bit_position.one += 1;
-            }
-            bit_positions.items[i] = bit_position;
+        // The table represents a binary tree containing the count of `0`s and `1`s for a given prior sequence of `0`s and `1`s.
+        // The root of the tree is at index 1, and the left and right children of a node at index `i` are at indices `i * 2 + 1`
+        // and `(i + 1) * 2 + 1` respectively. The count of `0`s is stored at index `i - 1` and the count of `1`s is stored
+        // at index `i`.
+        //
+        // ie. starting at a node index of 1 (root), the count of `0`s is located at index 0, and the count of `1`s is located
+        // at index 1. If the value is a `0` we move to the left child index at `(i + char - '0') * 2 + 1 = 3`. If the value is a
+        // `1` we move to the right child index at `(i + char - '0') * 2 + 1 = 5`.
+        var node_i: u32 = 1;
+        for (readings[readings_pos .. readings_pos + reading_length]) |char| {
+            bit_count_tree[node_i + char - '0' - 1] += 1;
+            node_i += char - '0';
+            node_i *= 2;
+            node_i += 1;
         }
     }
 
-    return bit_positions;
-}
+    const c_rating = calculateChemical(.co2, reading_length, bit_count_tree);
+    const o_rating = calculateChemical(.oxygen, reading_length, bit_count_tree);
 
-fn oxygenGeneratorRating(readings: List(u12)) anyerror!u12 {
-    var remaining_readings = readings;
-
-    var pos: u4 = 0;
-    while (remaining_readings.items.len != 1) {
-        var new_readings = List(u12).init(gpa);
-        var c = try counts(remaining_readings.items);
-        defer c.deinit();
-
-        for (remaining_readings.items) |reading| {
-            var bit_position_count = c.items[pos];
-            if (bit_position_count.zero > bit_position_count.one) {
-                const bit = (reading >> bit_position_len - pos - 1) & 1;
-                if (bit == 0) {
-                    try new_readings.append(reading);
-                }
-            } else {
-                const bit = (reading >> bit_position_len - pos - 1) & 1;
-                if (bit == 1) {
-                    try new_readings.append(reading);
-                }
-            }
-        }
-
-        remaining_readings.deinit();
-        remaining_readings = new_readings;
-
-        pos += 1;
-    }
-    defer remaining_readings.deinit();
-    return remaining_readings.items[0];
-}
-
-fn c02ScrubberRating(readings: List(u12)) anyerror!u12 {
-    var remaining_readings = readings;
-
-    var pos: u4 = 0;
-    while (remaining_readings.items.len != 1) {
-        var new_readings = List(u12).init(gpa);
-        var c = try counts(remaining_readings.items);
-        defer c.deinit();
-
-        for (remaining_readings.items) |reading| {
-            var bit_position_count = c.items[pos];
-            if (bit_position_count.zero > bit_position_count.one) {
-                const bit = (reading >> bit_position_len - pos - 1) & 1;
-                if (bit == 1) {
-                    try new_readings.append(reading);
-                }
-            } else {
-                const bit = (reading >> bit_position_len - pos - 1) & 1;
-                if (bit == 0) {
-                    try new_readings.append(reading);
-                }
-            }
-        }
-
-        remaining_readings.deinit();
-        remaining_readings = new_readings;
-
-        pos += 1;
-    }
-    defer remaining_readings.deinit();
-    return remaining_readings.items[0];
-}
-
-pub fn day2() anyerror!void {
-    var bit_numbers = List(u12).init(gpa);
-    defer bit_numbers.deinit();
-
-    var lines = split(u8, data, "\n");
-    while (lines.next()) |line| {
-        if (line.len == 0) {
-            continue;
-        }
-
-        try bit_numbers.append(try std.fmt.parseInt(u12, line, 2));
-    }
-    const c_rating = try c02ScrubberRating(try bit_numbers.clone());
-    const o_rating = try oxygenGeneratorRating(try bit_numbers.clone());
     print("life support rating: {d}\n", .{@as(u32, c_rating) * @as(u32, o_rating)});
+}
+
+const Chemical = enum {
+    oxygen,
+    co2,
+};
+
+fn calculateChemical(comptime chemical: Chemical, reading_length: usize, bit_count_tree: []u32) u32 {
+    var i: usize = 0;
+    var node_i: usize = 1;
+    var result: u32 = 0;
+
+    while (i < reading_length) : (i += 1) {
+        var zeros_count = bit_count_tree[node_i - 1];
+        var ones_count = bit_count_tree[node_i];
+        var res: u32 = switch (chemical) {
+            // rule: keep entries with the most common bit, or 1 if equal
+            .oxygen => block: {
+                // If there is only one total count, we already know the result. We can walk the rest of the tree to
+                // the leaf by following the branch with the count of 1.
+                if (zeros_count + ones_count == 1) {
+                    break :block 1 - zeros_count;
+                    // the above is equivalent to:
+                    // :block if (ones_count > zeros_count) @as(u32, 1) else @as(u32, 0);
+                }
+                break :block @boolToInt(zeros_count <= ones_count);
+            },
+            // rule: keep entries with the least common bit, or 0 if equal
+            .co2 => block: {
+                if (zeros_count + ones_count == 1) {
+                    break :block 1 - zeros_count;
+                }
+                break :block @boolToInt(zeros_count > ones_count);
+            },
+        };
+
+        result <<= 1;
+        result += res;
+        node_i += res;
+        node_i *= 2;
+        node_i += 1;
+    }
+
+    return result;
 }
 
 // Useful util functions
