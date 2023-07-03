@@ -10,14 +10,14 @@ const gpa = util.gpa;
 
 const data = @embedFile("data/day06.txt");
 
-pub fn main() anyerror!void {
+pub fn main() !void {
     try day1();
     try day2();
 }
 
-pub fn day1() anyerror!void {}
+pub fn day1() !void {}
 
-pub fn day2() anyerror!void {}
+pub fn day2() !void {}
 
 // Useful util functions
 const window = util.window;
